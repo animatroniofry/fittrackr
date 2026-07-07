@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fitness Tracker</title>
+<meta name="theme-color" content="#07080A">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fitness">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#07080A; --card:#111411; --card2:#171B17; --border:#232922;
+    --text:#E9F5EA; --sub:#7C8C7C; --sub2:#4B564B;
+    --good:#B6FF3B; --bad:#FF4D4D; --accent:#B6FF3B;
+    --radius:18px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:'Inter',system-ui,sans-serif; overscroll-behavior-y:none;}
+  h1,h2,h3,.disp{font-family:'Outfit',system-ui,sans-serif;}
+  #app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;
+    padding-bottom:calc(74px + env(safe-area-inset-bottom));}
+
+  header.topbar{display:flex;align-items:center;justify-content:space-between;
+    padding:18px 20px 8px;padding-top:calc(18px + env(safe-area-inset-top));}
+  header.topbar .greet{font-size:13px;color:var(--sub);margin:0 0 2px;}
+  header.topbar h1{font-size:22px;margin:0;font-weight:700;}
+  .user-pill{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);
+    padding:6px 12px 6px 6px;border-radius:999px;font-size:13px;font-weight:600;color:var(--text);}
+  .dot{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:700;color:#0d0e10;flex-shrink:0;overflow:hidden;background-size:cover;background-position:center;}
+  .dot img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+
+  main{flex:1;padding:6px 20px 20px;}
+  .tab{display:none;}
+  .tab.active{display:block;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    padding:18px;margin-bottom:14px;}
+  .card h3{margin:0 0 12px;font-size:14px;color:var(--sub);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+  .row{display:flex;gap:12px;}
+  .row .card{flex:1;}
+
+  .big-num{font-size:34px;font-weight:800;font-family:'Outfit',sans-serif;line-height:1;}
+  .big-num small{font-size:15px;color:var(--sub);font-weight:500;}
+  .delta{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:600;margin-top:6px;}
+  .delta.good{color:var(--good);} .delta.bad{color:var(--bad);} .delta.flat{color:var(--sub);}
+
+  .ring-wrap{display:flex;align-items:center;gap:16px;}
+  .ring-label{flex:1;}
+  .ring-label .n{font-size:26px;font-weight:800;font-family:'Outfit',sans-serif;}
+  .ring-label .l{font-size:13px;color:var(--sub);}
+
+  .macro-bar{margin-bottom:12px;}
+  .macro-bar .lbl{display:flex;justify-content:space-between;font-size:12.5px;color:var(--sub);margin-bottom:5px;}
+  .macro-bar .track{height:8px;border-radius:99px;background:var(--card2);overflow:hidden;}
+  .macro-bar .fill{height:100%;border-radius:99px;background:var(--accent);transition:width .4s;}
+
+  canvas{max-width:100%;}
+
+  label.field{display:block;margin-bottom:14px;}
+  label.field span{display:block;font-size:12.5px;color:var(--sub);margin-bottom:6px;font-weight:600;}
+  input, select{width:100%;background:var(--card2);border:1px solid var(--border);color:var(--text);
+    padding:12px 14px;border-radius:12px;font-size:16px;font-family:inherit;}
+  input:focus, select:focus{outline:none;border-color:var(--accent);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px;}
+
+  button.primary{width:100%;background:var(--accent);color:#161311;border:none;padding:15px;
+    border-radius:14px;font-size:16px;font-weight:700;font-family:'Outfit',sans-serif;margin-top:4px;}
+  button.primary:active{opacity:.85;}
+  button:disabled{opacity:.55; pointer-events:none;}
+  button.ghost{width:100%;background:transparent;border:1px solid var(--border);color:var(--text);
+    padding:13px;border-radius:14px;font-weight:600;font-size:14.5px;margin-top:8px;}
+  .toast{position:fixed;bottom:calc(90px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
+    background:var(--good);color:#0e1210;padding:10px 18px;border-radius:99px;font-weight:700;font-size:14px;
+    opacity:0;transition:opacity .25s, transform .25s; pointer-events:none; white-space:nowrap;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px);}
+
+  .person-btn{display:flex;align-items:center;gap:12px;width:100%;background:var(--card2);
+    border:1px solid var(--border);padding:14px;border-radius:14px;margin-bottom:10px;color:var(--text);font-weight:700;font-size:15px;}
+  .person-btn.selected{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset;}
+
+  .color-grid{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;}
+  .color-swatch{width:38px;height:38px;border-radius:50%;border:3px solid transparent;padding:0;}
+  .color-swatch.selected{border-color:#fff;}
+
+  /* segmented control (Zápis <-> Miery v jednom tabe) */
+  .segmented{display:flex;background:var(--card2);border:1px solid var(--border);border-radius:14px;
+    padding:4px;margin-bottom:16px;}
+  .segmented button{flex:1;background:transparent;border:none;color:var(--sub);padding:10px 8px;
+    border-radius:11px;font-weight:700;font-size:13.5px;font-family:'Outfit',sans-serif;}
+  .segmented button.active{background:var(--accent);color:#161311;}
+  .subpanel{display:none;}
+  .subpanel.active{display:block;}
+
+  /* leaderboard */
+  .lb-card{display:flex;align-items:center;gap:14px;padding:14px;border-radius:16px;background:var(--card2);
+    border:1px solid var(--border);margin-bottom:10px;}
+  .lb-card.clickable{cursor:pointer;}
+  .lb-rank{font-size:20px;font-weight:800;font-family:'Outfit',sans-serif;color:var(--sub);width:22px;}
+  .lb-rank.first{color:var(--good);}
+  .lb-name{flex:1;}
+  .lb-name .n{font-weight:700;font-size:15px;}
+  .lb-name .s{font-size:12px;color:var(--sub);}
+  .lb-points{text-align:right;}
+  .lb-points .p{font-size:22px;font-weight:800;font-family:'Outfit',sans-serif;}
+  .lb-points .trend{font-size:12px;font-weight:700;}
+  .lb-points .trend.up{color:var(--good);} .lb-points .trend.down{color:var(--bad);} .lb-points .trend.flat{color:var(--sub);}
+
+  /* profil */
+  .profile-hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:8px 0 4px;}
+  .avatar-big{width:88px;height:88px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:32px;font-weight:800;color:#0d0e10;position:relative;overflow:hidden;background-size:cover;background-position:center;
+    font-family:'Outfit',sans-serif;}
+  .avatar-big img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+  .avatar-edit{position:absolute;bottom:-2px;right:-2px;width:30px;height:30px;border-radius:50%;background:var(--card);
+    border:2px solid var(--bg);display:flex;align-items:center;justify-content:center;font-size:14px;}
+  .profile-hero h2{margin:14px 0 2px;font-size:20px;}
+  .profile-hero .since{color:var(--sub);font-size:12.5px;}
+  .history-row{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13.5px;}
+  .history-row:last-child{border-bottom:none;}
+  .history-row .w{width:52px;color:var(--sub);font-weight:600;}
+  .history-row .v{flex:1;text-align:center;}
+  .history-empty{text-align:center;color:var(--sub);font-size:13px;padding:14px 0;}
+  .back-link{display:inline-flex;align-items:center;gap:6px;color:var(--sub);font-size:13.5px;font-weight:600;
+    margin-bottom:10px;background:none;border:none;padding:0;}
+
+  nav.bottom{position:fixed;bottom:0;left:0;right:0;background:rgba(20,23,26,.92);backdrop-filter:blur(14px);
+    border-top:1px solid var(--border);display:flex;padding-bottom:env(safe-area-inset-bottom);z-index:20;}
+  nav.bottom .n-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 0 8px;
+    color:var(--sub2);font-size:10.5px;font-weight:600;}
+  nav.bottom .n-item.active{color:var(--accent);}
+  nav.bottom .n-item svg{width:21px;height:21px;}
+
+  #setup{position:fixed;inset:0;background:var(--bg);z-index:50;display:flex;align-items:center;padding:24px;overflow-y:auto;}
+  #setup .box{max-width:420px;margin:0 auto;width:100%;}
+  #setup h2{font-size:24px;margin:0 0 6px;}
+  #setup p.help{color:var(--sub);font-size:13.5px;line-height:1.5;margin-bottom:18px;}
+  .week-empty{text-align:center;color:var(--sub);font-size:13.5px;padding:20px 0;}
+  .photo-picker{display:flex;align-items:center;gap:14px;margin-bottom:16px;}
+  .photo-picker input[type=file]{display:none;}
+  .photo-picker label{margin:0;flex:1;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header class="topbar">
+    <div>
+      <p class="greet" id="greet">Ahoj</p>
+      <h1 id="pageTitle">Dashboard</h1>
+    </div>
+    <div class="user-pill" id="userPill" onclick="goTab('profil')">
+      <span class="dot" id="userDot"></span>
+      <span id="userName">—</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- DASHBOARD -->
+    <section class="tab active" id="tab-dashboard">
+      <div class="segmented">
+        <button type="button" class="active" data-sub="dash-compare" onclick="goDashSub('dash-compare')">Porovnanie</button>
+        <button type="button" data-sub="dash-self" onclick="goDashSub('dash-self')">Len ja</button>
+      </div>
+
+      <!-- POROVNANIE S OSTATNÝMI -->
+      <div class="subpanel active" id="sub-dash-compare">
+        <div class="card">
+          <h3>Rebríček</h3>
+          <div id="dLbPreview"></div>
+        </div>
+
+        <div class="card">
+          <h3>Váha — porovnanie</h3>
+          <canvas id="compareChart" height="180"></canvas>
+          <div class="week-empty" id="compareEmpty" style="display:none;">Zatiaľ nie je čo porovnávať — zapíšte si aspoň jednu váhu.</div>
+        </div>
+      </div>
+
+      <!-- ČISTO ZA MŇA -->
+      <div class="subpanel" id="sub-dash-self">
+        <div class="row">
+          <div class="card">
+            <h3>Aktuálna váha</h3>
+            <div class="big-num" id="dWeight">— <small>kg</small></div>
+            <div class="delta" id="dDelta"></div>
+          </div>
+          <div class="card">
+            <h3>Tréningy tento týždeň</h3>
+            <div class="ring-wrap">
+              <svg id="ring" width="64" height="64" viewBox="0 0 64 64"></svg>
+              <div class="ring-label">
+                <div class="n" id="dTrainings">0/7</div>
+                <div class="l">splnené</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Váha — trend a prognóza</h3>
+          <canvas id="weightChart" height="140"></canvas>
+          <div class="week-empty" id="weightEmpty" style="display:none;">Zatiaľ žiadne dáta na graf — zapíš prvú váhu v sekcii Zápis.</div>
+          <div id="forecastText" style="margin-top:10px;font-size:13px;color:var(--sub);line-height:1.5;"></div>
+        </div>
+
+        <div class="card">
+          <h3>Tréningy podľa týždňov</h3>
+          <canvas id="trainingHistoryChart" height="110"></canvas>
+        </div>
+
+        <div class="card">
+          <h3>Strava — priemer tohto týždňa</h3>
+          <div class="macro-bar">
+            <div class="lbl"><span>Kalórie</span><span id="mKcalTxt">— / —</span></div>
+            <div class="track"><div class="fill" id="mKcal"></div></div>
+          </div>
+          <div class="macro-bar">
+            <div class="lbl"><span>Bielkoviny</span><span id="mProtTxt">— / —</span></div>
+            <div class="track"><div class="fill" id="mProt"></div></div>
+          </div>
+          <div class="macro-bar">
+            <div class="lbl"><span>Sacharidy</span><span id="mCarbTxt">— / —</span></div>
+            <div class="track"><div class="fill" id="mCarb"></div></div>
+          </div>
+          <div class="macro-bar" style="margin-bottom:0;">
+            <div class="lbl"><span>Tuky</span><span id="mFatTxt">— / —</span></div>
+            <div class="track"><div class="fill" id="mFat"></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ZÁPIS (denný záznam + miery v jednom tabe, prekliká sa medzi nimi) -->
+    <section class="tab" id="tab-entry">
+      <div class="segmented">
+        <button type="button" class="active" data-sub="entry-daily" onclick="goSub('entry-daily')">Denný záznam</button>
+        <button type="button" data-sub="entry-miery" onclick="goSub('entry-miery')">Miery</button>
+      </div>
+
+      <div class="subpanel active" id="sub-entry-daily">
+        <div class="card">
+          <label class="field">
+            <span>Dátum</span>
+            <input type="date" id="entryDate">
+          </label>
+
+          <label class="field">
+            <span>Váha (kg)</span>
+            <input type="number" step="0.1" inputmode="decimal" id="fWeight" placeholder="napr. 82.4">
+          </label>
+
+          <label class="field">
+            <span>Dnešný tréning</span>
+            <select id="fTraining"></select>
+          </label>
+
+          <div class="grid2">
+            <label class="field"><span>Kalórie (kcal)</span><input type="number" inputmode="numeric" id="fKcal"></label>
+            <label class="field"><span>Bielkoviny (g)</span><input type="number" inputmode="numeric" id="fProtein"></label>
+            <label class="field"><span>Sacharidy (g)</span><input type="number" inputmode="numeric" id="fCarbs"></label>
+            <label class="field"><span>Tuky (g)</span><input type="number" inputmode="numeric" id="fFat"></label>
+          </div>
+
+          <button class="primary" onclick="saveEntry(this)">Uložiť záznam</button>
+        </div>
+      </div>
+
+      <div class="subpanel" id="sub-entry-miery">
+        <div class="card">
+          <label class="field">
+            <span>Aktuálny týždeň</span>
+            <div id="mierWeekLabel" style="padding:10px 0; font-weight:bold;"></div>
+          </label>
+          <div class="grid2" id="mierFields"></div>
+          <button class="primary" onclick="saveMeasurements(this)">Uložiť miery</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- REBRÍČEK -->
+    <section class="tab" id="tab-leaderboard">
+      <div class="segmented" id="lbSegmented">
+        <button type="button" class="active" data-lb="month" onclick="goLbMode('month')">Tento mesiac</button>
+        <button type="button" data-lb="total" onclick="goLbMode('total')">Celkovo</button>
+      </div>
+      <div class="card">
+        <h3>Rebríček</h3>
+        <div id="lbFull"></div>
+        <p class="help" style="color:var(--sub);font-size:12.5px;line-height:1.5;margin:10px 0 0;">
+          Body: 2 za splnený tréning, 1 za zapísanú váhu, 1 za zapísanú stravu (za deň) + bonus 5 bodov za 7/7 tréningov v týždni. Klepni na niekoho — uvidíš jeho profil.
+        </p>
+      </div>
+    </section>
+
+    <!-- PROFIL (vlastný alebo cudzí, po klepnutí v rebríčku) -->
+    <section class="tab" id="tab-profil">
+      <button class="back-link" id="profilBackBtn" style="display:none;" onclick="loadProfile(MY_SLOT)">← Späť na môj profil</button>
+
+      <div class="card">
+        <div class="profile-hero">
+          <div class="avatar-big" id="pAvatar">
+            <div class="avatar-edit" id="pAvatarEdit" style="display:none;" onclick="document.getElementById('photoInput').click()">✏️</div>
+          </div>
+          <h2 id="pName">—</h2>
+          <div class="since" id="pSince"></div>
+          <input type="file" id="photoInput" accept="image/*" onchange="onPhotoChosen(event)">
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>História po týždňoch</h3>
+        <div id="pHistory"></div>
+      </div>
+
+      <div class="card">
+        <h3>Porovnanie</h3>
+        <div id="pComparison"></div>
+      </div>
+    </section>
+
+    <!-- NASTAVENIA -->
+    <section class="tab" id="tab-settings">
+      <div class="card">
+        <h3>Môj profil</h3>
+        <div id="myProfileCard"></div>
+        <label class="field" style="margin-top:14px;"><span>Meno</span><input type="text" id="setName"></label>
+        <label class="field"><span>Farba</span></label>
+        <div class="color-grid" id="setColorPicker"></div>
+        <label class="field"><span>Nový PIN (nechaj prázdne, ak nemeníš)</span><input type="password" inputmode="numeric" id="setNewPin" placeholder="••••"></label>
+        <label class="field"><span>Súčasný PIN (na potvrdenie)</span><input type="password" inputmode="numeric" id="setCurrentPin" placeholder="••••"></label>
+        <button class="primary" onclick="saveProfileEdit(this)">Uložiť zmeny profilu</button>
+        <button class="ghost" onclick="logout()">Odhlásiť sa / prepnúť profil</button>
+      </div>
+
+      <div class="card">
+        <h3>Denné ciele</h3>
+        <div class="grid2">
+          <label class="field"><span>Kalórie (kcal)</span><input type="number" id="gKcal"></label>
+          <label class="field"><span>Bielkoviny (g)</span><input type="number" id="gProtein"></label>
+          <label class="field"><span>Sacharidy (g)</span><input type="number" id="gCarbs"></label>
+          <label class="field"><span>Tuky (g)</span><input type="number" id="gFat"></label>
+        </div>
+        <button class="primary" onclick="saveGoals(this)">Uložiť ciele</button>
+      </div>
+
+      <div class="card">
+        <h3>Vymazanie profilu</h3>
+        <p class="help" style="color:var(--sub);font-size:12.5px;line-height:1.5;margin:0 0 12px;">
+          Natrvalo vymaže tvoje meno, farbu, fotku a PIN a uvoľní tvoje miesto pre niekoho nového. Historické dáta v Sheete (Miery/Strava/Cvičenie) ostanú zachované v minulých týždňoch.
+          Ak chceš vymazať <b>niekoho iného</b> (napr. člena rodiny, ktorý prestal appku používať), stačí priamo v Google Sheete otvoriť menu <b>🏋️ Fitness Tracker → Spravovať profily</b> — netreba na to jeho PIN.
+        </p>
+        <label class="field"><span>Tvoj PIN (na potvrdenie)</span><input type="password" inputmode="numeric" id="delPin" placeholder="••••"></label>
+        <button class="ghost" style="border-color:var(--bad);color:var(--bad);" onclick="deleteOwnProfile(this)">Vymazať môj profil</button>
+      </div>
+
+      <div class="card">
+        <h3>Pripojenie k Google Sheetu</h3>
+        <label class="field">
+          <span>Apps Script Web App URL</span>
+          <input type="text" id="apiUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
+        </label>
+        <button class="ghost" onclick="saveApiUrl()">Uložiť URL</button>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom">
+    <div class="n-item active" data-tab="dashboard" onclick="goTab('dashboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13h4v8H3zM10 8h4v13h-4zM17 3h4v18h-4z"/></svg>
+      Dashboard
+    </div>
+    <div class="n-item" data-tab="entry" onclick="goTab('entry')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      Zápis
+    </div>
+    <div class="n-item" data-tab="leaderboard" onclick="goTab('leaderboard')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 01-10 0V4zM7 6H4a3 3 0 003 3M17 6h3a3 3 0 01-3 3"/></svg>
+      Rebríček
+    </div>
+    <div class="n-item" data-tab="profil" onclick="goTab('profil')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-7 8-7s8 3 8 7"/></svg>
+      Profil
+    </div>
+    <div class="n-item" data-tab="settings" onclick="goTab('settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.6 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9c.2.6.7 1 1.5 1h.1a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+      Nastavenia
+    </div>
+  </nav>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<!-- SETUP / LOGIN OVERLAY -->
+<div id="setup">
+  <div class="box">
+    <h2>Fitness Tracker</h2>
+    <p class="help" id="setupHelp">Najprv appku napoj na váš Google Sheet.</p>
+
+    <div id="setupApiStep">
+      <label class="field">
+        <span>Apps Script Web App URL</span>
+        <input type="text" id="setupApiUrl" placeholder="https://script.google.com/macros/s/.../exec">
+      </label>
+      <p class="help" style="margin-top:-8px;">Nájdeš ju v Google Sheete: Rozšírenia → Apps Script → Nasadiť → Web App. Presný postup je v README.</p>
+      <button class="primary" onclick="submitApiUrl(this)">Pokračovať</button>
+    </div>
+
+    <div id="setupChoiceStep" style="display:none;">
+      <button class="primary" onclick="showLoginStep()">Prihlásiť sa</button>
+      <button class="ghost" onclick="showCreateStep()">Vytvoriť nový profil</button>
+    </div>
+
+    <div id="setupLoginStep" style="display:none;">
+      <label class="field">
+        <span>Meno</span>
+        <input type="text" id="loginName" placeholder="napr. Peter">
+      </label>
+      <label class="field">
+        <span>PIN</span>
+        <input type="password" inputmode="numeric" id="loginPin" placeholder="••••">
+      </label>
+      <button class="primary" onclick="submitLogin(this)">Prihlásiť sa</button>
+      <button class="ghost" onclick="showChoiceStep()">Späť</button>
+    </div>
+
+    <div id="setupCreateStep" style="display:none;">
+      <label class="field"><span>Tvoje meno</span><input type="text" id="createName" placeholder="napr. Peter"></label>
+      <label class="field"><span>Farba</span></label>
+      <div class="color-grid" id="colorPicker"></div>
+      <div class="photo-picker">
+        <label class="field" style="margin-bottom:0;">
+          <span>Profilovka (voliteľné)</span>
+          <button type="button" class="ghost" style="margin-top:0;" onclick="document.getElementById('createPhotoInput').click()" id="createPhotoBtn">Vybrať fotku</button>
+        </label>
+        <input type="file" id="createPhotoInput" accept="image/*" onchange="onCreatePhotoChosen(event)">
+      </div>
+      <label class="field"><span>Zvoľ si PIN (aspoň 4 znaky)</span><input type="password" inputmode="numeric" id="createPin" placeholder="••••"></label>
+      <button class="primary" onclick="submitCreateProfile(this)">Vytvoriť profil a prihlásiť sa</button>
+      <button class="ghost" onclick="showChoiceStep()">Späť</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= STATE ================= */
+let API_URL = localStorage.getItem('ft_api') || '';
+let CURRENT_SLOT = localStorage.getItem('ft_slot') !== null && localStorage.getItem('ft_slot') !== '' ? Number(localStorage.getItem('ft_slot')) : null;
+let CURRENT_USER = localStorage.getItem('ft_name') || '';
+let CURRENT_COLOR = localStorage.getItem('ft_color') || '#B6FF3B';
+let CURRENT_PHOTO = localStorage.getItem('ft_photo') || '';
+let MY_SLOT = null; // alias CURRENT_SLOT po boote, pouzite na "spat na svoj profil"
+let INIT = null;
+let weightChart = null;
+let CREATE_PHOTO_BASE64 = null, CREATE_PHOTO_MIME = null;
+
+function toast(msg, ms){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(()=>t.classList.remove('show'), ms || 1800);
+}
+
+/* Poistka proti dvojkliku: kým beží požiadavka pre daný kľúč, ďalšie kliknutie sa ignoruje
+   a tlačidlo sa dočasne zablokuje a ukáže "prebieha" text, nech je jasné že appka pracuje. */
+const INFLIGHT_ = new Set();
+async function guarded_(key, btn, busyText, fn){
+  if (INFLIGHT_.has(key)) return;
+  INFLIGHT_.add(key);
+  let originalText;
+  if (btn){ originalText = btn.textContent; btn.disabled = true; btn.textContent = busyText; }
+  try{ await fn(); }
+  finally{
+    INFLIGHT_.delete(key);
+    if (btn){ btn.disabled = false; btn.textContent = originalText; }
+  }
+}
+
+window.addEventListener('error', function(e){
+  toast('⚠ Chyba appky: ' + (e.message || 'neznáma chyba'), 6000);
+});
+window.addEventListener('unhandledrejection', function(e){
+  const r = e.reason;
+  toast('⚠ Chyba appky: ' + (r && r.message ? r.message : String(r)), 6000);
+});
+
+function stripEmoji(s){
+  return String(s).replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]/gu, '').trim();
+}
+
+function avatarHtml(name, color, photoUrl, initialLetter){
+  if (photoUrl){
+    return `<img src="${photoUrl}" alt="${name||''}">`;
+  }
+  return (initialLetter || (name?name[0]:'?'));
+}
+
+/* ================= FOTKA — zmenšenie v prehliadači pred odoslaním ================= */
+function resizeImageFile(file, maxSize){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w = img.width, h = img.height;
+        if (w > h && w > maxSize){ h = Math.round(h * maxSize / w); w = maxSize; }
+        else if (h > maxSize){ w = Math.round(w * maxSize / h); h = maxSize; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        resolve(dataUrl.split(',')[1]); // len base64 cast
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ================= API ================= */
+async function parseApiResponse_(res){
+  const text = await res.text();
+  if (!res.ok){ throw new Error('Server vrátil chybu HTTP ' + res.status); }
+  try{ return JSON.parse(text); }
+  catch(err){
+    throw new Error('Server nevrátil dáta, ale ' + (text.slice(0,120).includes('<') ? 'HTML stránku (skontroluj nastavenie nasadenia Apps Scriptu — Execute as / Who has access, alebo že URL končí na /exec)' : 'neočakávaný obsah'));
+  }
+}
+function friendlyNetworkError_(err){
+  const msg = String(err && err.message ? err.message : err);
+  if (!API_URL) return 'Appka nie je napojená na Sheet — vlož Web App URL v Nastaveniach.';
+  if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('Load failed')){
+    return 'Nepodarilo sa spojiť s Google Sheetom. Skontroluj: 1) si online, 2) URL končí na /exec (nie /dev), 3) v Apps Scripte je nasadenie "Kto má prístup: Ktokoľvek", 4) po poslednej zmene Code.gs si spravil/a Nasadiť → Spravovať nasadenia → Nová verzia.';
+  }
+  return msg;
+}
+async function apiGet(action, params){
+  try{
+    if (!API_URL) return { error: friendlyNetworkError_('') };
+    const url = new URL(API_URL);
+    url.searchParams.set('action', action);
+    Object.keys(params||{}).forEach(k=>url.searchParams.set(k, params[k]));
+    const res = await fetch(url.toString());
+    return await parseApiResponse_(res);
+  }catch(err){
+    return { error: friendlyNetworkError_(err) };
+  }
+}
+async function apiPost(action, payload){
+  try{
+    if (!API_URL) return { error: friendlyNetworkError_('') };
+    const body = Object.assign({action}, payload);
+    const res = await fetch(API_URL, { method:'POST', body: JSON.stringify(body) });
+    return await parseApiResponse_(res);
+  }catch(err){
+    return { error: friendlyNetworkError_(err) };
+  }
+}
+
+/* ================= SETUP FLOW ================= */
+function initApp(){
+  if (!API_URL){
+    document.getElementById('setup').style.display='flex';
+    return;
+  }
+  document.getElementById('setupApiUrl').value = API_URL;
+  if (CURRENT_SLOT===null){
+    loadProfilesAndShowChoice();
+    return;
+  }
+  document.getElementById('setup').style.display='none';
+  boot();
+}
+
+async function submitApiUrl(btn){
+  await guarded_('submitApiUrl', btn, 'Pripájam…', async ()=>{
+    const v = document.getElementById('setupApiUrl').value.trim();
+    if (!v){ toast('Vlož URL'); return; }
+    API_URL = v;
+    localStorage.setItem('ft_api', v);
+    await loadProfilesAndShowChoice();
+  });
+}
+
+async function loadProfilesAndShowChoice(){
+  document.getElementById('setupApiStep').style.display='none';
+  document.getElementById('setupHelp').textContent = 'Načítavam…';
+  try{
+    INIT = await apiGet('init', {});
+    if (INIT.error) throw new Error(INIT.error);
+  }catch(err){
+    document.getElementById('setupApiStep').style.display='block';
+    document.getElementById('setupHelp').textContent = 'Nepodarilo sa pripojiť k Sheetu: ' + (err && err.message ? err.message : err);
+    return;
+  }
+  showChoiceStep();
+}
+
+function showChoiceStep(){
+  hideAllSetupSteps();
+  document.getElementById('setupChoiceStep').style.display='block';
+  document.getElementById('setupHelp').textContent = '✓ Pripojené k tvojmu Sheetu. Prihlás sa alebo si vytvor nový profil.';
+}
+function showLoginStep(){
+  hideAllSetupSteps();
+  document.getElementById('setupLoginStep').style.display='block';
+  document.getElementById('setupHelp').textContent = 'Zadaj svoje meno a PIN.';
+  document.getElementById('loginName').value='';
+  document.getElementById('loginPin').value='';
+}
+function showCreateStep(){
+  hideAllSetupSteps();
+  document.getElementById('setupCreateStep').style.display='block';
+  document.getElementById('setupHelp').textContent = 'Vytvor si profil.';
+  renderColorPicker('colorPicker', (INIT && INIT.colorChoices && INIT.colorChoices[0]) || '#B6FF3B');
+  document.getElementById('createName').value='';
+  document.getElementById('createPin').value='';
+  document.getElementById('createPhotoBtn').textContent = 'Vybrať fotku';
+  CREATE_PHOTO_BASE64 = null; CREATE_PHOTO_MIME = null;
+}
+function hideAllSetupSteps(){
+  ['setupChoiceStep','setupLoginStep','setupCreateStep'].forEach(id=>{
+    document.getElementById(id).style.display='none';
+  });
+}
+
+function renderColorPicker(elId, selected){
+  const colors = (INIT && INIT.colorChoices) || ['#B6FF3B','#33E39A','#F0785A','#5AA9F0'];
+  const el = document.getElementById(elId);
+  el.innerHTML = colors.map(c=>
+    `<button type="button" class="color-swatch ${c===selected?'selected':''}" style="background:${c}" onclick="selectColor('${elId}','${c}')"></button>`
+  ).join('');
+  el.dataset.selected = selected;
+}
+function selectColor(elId, c){
+  const el = document.getElementById(elId);
+  el.dataset.selected = c;
+  el.querySelectorAll('.color-swatch').forEach(b=>b.classList.toggle('selected', b.style.background===hexToRgbStr(c)));
+}
+function hexToRgbStr(hex){
+  const el = document.createElement('div'); el.style.background = hex; document.body.appendChild(el);
+  const rgb = getComputedStyle(el).backgroundColor; document.body.removeChild(el); return rgb;
+}
+
+async function onCreatePhotoChosen(ev){
+  const file = ev.target.files[0];
+  if (!file) return;
+  try{
+    CREATE_PHOTO_BASE64 = await resizeImageFile(file, 500);
+    CREATE_PHOTO_MIME = 'image/jpeg';
+    document.getElementById('createPhotoBtn').textContent = 'Fotka vybraná ✓';
+  }catch(err){ toast('Fotku sa nepodarilo spracovať'); }
+}
+
+async function submitLogin(btn){
+  await guarded_('login', btn, 'Prihlasujem…', async ()=>{
+    try{
+      const name = document.getElementById('loginName').value.trim();
+      const pin = document.getElementById('loginPin').value.trim();
+      if (!name){ toast('Zadaj meno'); return; }
+      if (!pin){ toast('Zadaj PIN'); return; }
+      const r = await apiGet('login', { name, pin });
+      if (r.error){ toast(r.error, 5000); return; }
+      if (r.slot===undefined || r.slot===null){
+        toast('⚠ Server vrátil neočakávanú odpoveď. Skontroluj, či je v Apps Scripte nasadená najnovšia verzia (Nasadiť → Spravovať nasadenia → Nová verzia).', 7000);
+        return;
+      }
+      applyLoginResult_(r);
+    }catch(err){
+      toast('⚠ ' + (err && err.message ? err.message : String(err)), 6000);
+    }
+  });
+}
+
+async function submitCreateProfile(btn){
+  await guarded_('createProfile', btn, 'Vytváram profil…', async ()=>{
+    try{
+      const name = document.getElementById('createName').value.trim();
+      const pin = document.getElementById('createPin').value.trim();
+      const color = document.getElementById('colorPicker').dataset.selected;
+      if (!name){ toast('Zadaj meno'); return; }
+      if (!pin || pin.length<4){ toast('PIN musí mať aspoň 4 znaky'); return; }
+      const r = await apiPost('createProfile', { name, color, pin });
+      if (r.error){ toast(r.error, 5000); return; }
+      if (r.slot===undefined || r.slot===null){
+        toast('⚠ Server vrátil neočakávanú odpoveď. Skontroluj, či je v Apps Scripte nasadená najnovšia verzia (Nasadiť → Spravovať nasadenia → Nová verzia).', 7000);
+        return;
+      }
+      if (CREATE_PHOTO_BASE64){
+        try{
+          await apiPost('savePhoto', { slot: r.slot, pin, base64: CREATE_PHOTO_BASE64, mime: CREATE_PHOTO_MIME });
+        }catch(err){ /* profil aj tak vznikol, foto sa da doplnit neskor v Nastaveniach */ }
+      }
+      applyLoginResult_(r);
+    }catch(err){
+      toast('⚠ ' + (err && err.message ? err.message : String(err)), 6000);
+    }
+  });
+}
+
+function applyLoginResult_(r){
+  CURRENT_SLOT = r.slot; CURRENT_USER = r.name; CURRENT_COLOR = r.color; CURRENT_PHOTO = r.photoUrl || '';
+  localStorage.setItem('ft_slot', CURRENT_SLOT);
+  localStorage.setItem('ft_name', CURRENT_USER);
+  localStorage.setItem('ft_color', CURRENT_COLOR);
+  localStorage.setItem('ft_photo', CURRENT_PHOTO);
+  document.getElementById('setup').style.display='none';
+  boot();
+}
+
+function logout(){
+  localStorage.removeItem('ft_slot');
+  localStorage.removeItem('ft_name');
+  localStorage.removeItem('ft_color');
+  localStorage.removeItem('ft_photo');
+  CURRENT_SLOT = null;
+  document.getElementById('setup').style.display='flex';
+  document.getElementById('setupApiStep').style.display='none';
+  loadProfilesAndShowChoice();
+}
+
+/* ================= BOOT ================= */
+async function boot(){
+  try{
+    INIT = await apiGet('init', {});
+    if (INIT.error) throw new Error(INIT.error);
+  }catch(err){
+    document.getElementById('setup').style.display='flex';
+    document.getElementById('setupApiStep').style.display='block';
+    hideAllSetupSteps();
+    document.getElementById('setupHelp').textContent =
+      'Nepodarilo sa pripojiť k Sheetu: ' + (err && err.message ? err.message : err) +
+      '. Skontroluj Web App URL a nasadenie Apps Scriptu (pozri README, krok 1).';
+    return;
+  }
+  document.getElementById('setup').style.display='none';
+  MY_SLOT = CURRENT_SLOT;
+
+  document.getElementById('userName').textContent = CURRENT_USER;
+  document.getElementById('userDot').innerHTML = avatarHtml(CURRENT_USER, CURRENT_COLOR, CURRENT_PHOTO);
+  document.getElementById('userDot').style.background = CURRENT_COLOR;
+  document.documentElement.style.setProperty('--accent', CURRENT_COLOR);
+  document.getElementById('greet').textContent = 'Ahoj, ' + CURRENT_USER;
+  document.getElementById('entryDate').value = INIT.today;
+
+  document.getElementById('fTraining').innerHTML =
+    '<option value="">— nevybrané —</option>' +
+    INIT.trainingOptions.map(o=>`<option value="${o}">${stripEmoji(o)}</option>`).join('');
+
+  const curWeek = INIT.week || 1;
+  document.getElementById('mierWeekLabel').textContent = weekRangeLabelClient_(curWeek) + ' (aktuálny týždeň)';
+
+  buildMierFields();
+  renderMyProfileCard();
+  loadDashboard();
+  loadEntry();
+  loadMeasurements();
+  loadGoals();
+  loadLeaderboard();
+  goTab('dashboard');
+}
+
+/* ================= NAV ================= */
+function goTab(tab){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.querySelectorAll('.n-item').forEach(n=>n.classList.toggle('active', n.dataset.tab===tab));
+  const titles = {dashboard:'Dashboard', entry:'Zápis', leaderboard:'Rebríček', profil:'Profil', settings:'Nastavenia'};
+  document.getElementById('pageTitle').textContent = titles[tab];
+  if (tab==='dashboard') loadDashboard();
+  if (tab==='leaderboard') loadLeaderboard();
+  if (tab==='profil') loadProfile(MY_SLOT);
+}
+
+function goSub(sub){
+  document.querySelectorAll('.subpanel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('sub-'+sub).classList.add('active');
+  document.querySelectorAll('.segmented button').forEach(b=>b.classList.toggle('active', b.dataset.sub===sub));
+}
+
+function goDashSub(sub){
+  document.querySelectorAll('#tab-dashboard .subpanel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('sub-'+sub).classList.add('active');
+  document.querySelectorAll('#tab-dashboard .segmented button').forEach(b=>b.classList.toggle('active', b.dataset.sub===sub));
+  if (sub==='dash-compare') loadDashboardCompare();
+  if (sub==='dash-self') loadDashboardSelf();
+}
+
+/* ================= DASHBOARD ================= */
+async function loadDashboard(){
+  if (CURRENT_SLOT===null) return;
+  await Promise.all([loadDashboardSelf(), loadDashboardCompare()]);
+}
+
+async function loadDashboardSelf(){
+  if (CURRENT_SLOT===null) return;
+  const d = await apiGet('dashboard', {slot: CURRENT_SLOT});
+  if (d.error) { toast(d.error); return; }
+
+  document.getElementById('dWeight').innerHTML = (d.latestWeight!=null ? d.latestWeight : '—') + ' <small>kg</small>';
+
+  const delta = document.getElementById('dDelta');
+  if (d.weightChange==null){
+    delta.textContent = 'zatiaľ žiadne dáta'; delta.className='delta flat';
+  } else {
+    const down = d.weightChange <= 0;
+    delta.textContent = (down?'▼ ':'▲ ') + Math.abs(d.weightChange) + ' kg od štartu';
+    delta.className = 'delta ' + (down?'good':'bad');
+  }
+
+  drawRing(d.trainingsDone, d.trainingsTotal);
+  document.getElementById('dTrainings').textContent = d.trainingsDone + '/' + d.trainingsTotal;
+
+  setMacro('mKcal','mKcalTxt', d.week.kcalAvg, d.goals.kcal, '', true);
+  setMacro('mProt','mProtTxt', d.week.proteinAvg, d.goals.protein, 'g', false);
+  setMacro('mCarb','mCarbTxt', d.week.carbsAvg, d.goals.carbs, 'g', true);
+  setMacro('mFat','mFatTxt', d.week.fatAvg, d.goals.fat, 'g', true);
+
+  drawWeightChart(d.weightTrend, d.forecast);
+  renderForecastText(d.weeklyRate, d.forecast);
+  drawTrainingHistoryChart(d.trainingsHistory);
+}
+
+function weekMonday_(week){
+  const start = new Date(INIT.startDate + 'T00:00:00');
+  const mon = new Date(start.getTime());
+  mon.setDate(mon.getDate() + (week-1)*7);
+  return mon;
+}
+function fmtDate_(d){ return d.getDate() + '.' + (d.getMonth()+1) + '.'; }
+function weekLabelClient_(week){ return fmtDate_(weekMonday_(week)); }
+function weekRangeLabelClient_(week){
+  const mon = weekMonday_(week);
+  const sun = new Date(mon.getTime()); sun.setDate(sun.getDate()+6);
+  return fmtDate_(mon) + '–' + fmtDate_(sun);
+}
+
+function renderForecastText(weeklyRate, forecast){
+  const el = document.getElementById('forecastText');
+  if (!el) return;
+  if (weeklyRate==null || !forecast || forecast.length===0){
+    el.textContent = 'Zapíš aspoň 2 týždne váhy a appka ti ukáže trend a prognózu do budúcnosti.';
+    return;
+  }
+  const dir = weeklyRate < 0 ? 'dole ▼' : (weeklyRate > 0 ? 'hore ▲' : 'rovno →');
+  const rateAbs = Math.abs(weeklyRate).toFixed(2);
+  const last = forecast[forecast.length-1];
+  el.innerHTML = `Trend: <b style="color:var(--text)">${rateAbs} kg/týždeň ${dir}</b>. ` +
+    `Pri tomto tempe budeš mať okolo <b style="color:var(--text)">${last.projected} kg</b> okolo ${weekLabelClient_(last.week)}. Bodkovaná čiara v grafe = prognóza.`;
+}
+
+/* ================= DASHBOARD — POROVNANIE ================= */
+let compareChart = null;
+async function loadDashboardCompare(){
+  if (CURRENT_SLOT===null) return;
+  const r = await apiGet('dashboardCompare', {});
+  if (r.error){ return; }
+
+  const canvas = document.getElementById('compareChart');
+  const empty = document.getElementById('compareEmpty');
+  const allWeeksSet = new Set();
+  r.profiles.forEach(p=>p.weightTrend.forEach(t=>allWeeksSet.add(t.week)));
+  const weeks = Array.from(allWeeksSet).sort((a,b)=>a-b);
+
+  if (weeks.length===0){
+    canvas.style.display='none'; empty.style.display='block';
+    if (compareChart){ compareChart.destroy(); compareChart=null; }
+    return;
+  }
+  canvas.style.display='block'; empty.style.display='none';
+
+  const labels = weeks.map(w=>weekLabelClient_(w));
+  const datasets = r.profiles.map(p=>{
+    const map = {};
+    p.weightTrend.forEach(t=>{ map[t.week]=t.avg; });
+    const isMe = p.slot===CURRENT_SLOT;
+    return {
+      label: p.name + (isMe?' (ty)':''),
+      data: weeks.map(w=> map[w]!=null ? map[w] : null),
+      borderColor: p.color, backgroundColor:'transparent', tension:.35,
+      pointRadius: isMe?3:2, borderWidth: isMe?3:1.5, spanGaps:true
+    };
+  });
+
+  if (compareChart) compareChart.destroy();
+  compareChart = new Chart(canvas, {
+    type:'line',
+    data:{ labels, datasets },
+    options:{ plugins:{legend:{display:true, position:'bottom', labels:{color:'#8B929B', font:{size:11}, boxWidth:10, usePointStyle:true}}},
+      scales:{ x:{ grid:{display:false}, ticks:{color:'#8B929B', font:{size:11}}},
+               y:{ grid:{color:'#2A2E33'}, ticks:{color:'#8B929B', font:{size:11}} } } }
+  });
+}
+
+function setMacro(fillId, txtId, val, goal, unit, lowerIsBetter){
+  const fill = document.getElementById(fillId);
+  const txt = document.getElementById(txtId);
+  if (val==null || !goal){
+    txt.textContent = (val!=null?Math.round(val):'—') + unit + ' / ' + (goal||'—') + unit;
+    fill.style.width = '0%'; fill.style.background = 'var(--sub2)';
+    return;
+  }
+  const pct = Math.min(100, Math.round((val/goal)*100));
+  txt.textContent = Math.round(val)+unit + ' / ' + goal+unit;
+  fill.style.width = pct + '%';
+  const over = val > goal;
+  fill.style.background = (lowerIsBetter ? (over?'var(--bad)':'var(--good)') : (over?'var(--good)':'var(--bad)'));
+}
+
+function drawRing(done, total){
+  const svg = document.getElementById('ring');
+  const r = 26, cx=32, cy=32, circ = 2*Math.PI*r;
+  let html = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#2A2E33" stroke-width="6"/>`;
+  const segGap = 4;
+  const segLen = (circ - total*segGap)/total;
+  let offset = 0;
+  for (let i=0;i<total;i++){
+    const color = i<done ? CURRENT_COLOR : 'transparent';
+    html += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="6"
+      stroke-dasharray="${segLen} ${circ-segLen}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})" stroke-linecap="round"/>`;
+    offset += segLen+segGap;
+  }
+  svg.innerHTML = html;
+}
+
+function drawWeightChart(trend, forecast){
+  const canvas = document.getElementById('weightChart');
+  const empty = document.getElementById('weightEmpty');
+  if (!trend || trend.length===0){
+    canvas.style.display='none'; empty.style.display='block';
+    return;
+  }
+  canvas.style.display='block'; empty.style.display='none';
+
+  const fc = forecast || [];
+  const labels = trend.map(t=>weekLabelClient_(t.week)).concat(fc.map(f=>weekLabelClient_(f.week)));
+  const actualData = trend.map(t=>t.avg).concat(fc.map(()=>null));
+  let forecastData = null;
+  if (fc.length){
+    forecastData = trend.map(()=>null);
+    forecastData[trend.length-1] = trend[trend.length-1].avg; // spojenie s poslednym reálnym bodom
+    fc.forEach(f=> forecastData.push(f.projected));
+  }
+
+  if (weightChart) weightChart.destroy();
+  const datasets = [{ data: actualData, borderColor: CURRENT_COLOR,
+    backgroundColor:'transparent', tension:.35, pointRadius:3, pointBackgroundColor: CURRENT_COLOR, borderWidth:2.5 }];
+  if (forecastData){
+    datasets.push({ data: forecastData, borderColor: CURRENT_COLOR, borderDash:[6,5],
+      backgroundColor:'transparent', tension:.35, pointRadius:2, pointBackgroundColor: CURRENT_COLOR, borderWidth:2 });
+  }
+
+  weightChart = new Chart(canvas, {
+    type:'line',
+    data:{ labels, datasets },
+    options:{ plugins:{legend:{display:false}},
+      scales:{ x:{ grid:{display:false}, ticks:{color:'#8B929B', font:{size:11}}},
+               y:{ grid:{color:'#2A2E33'}, ticks:{color:'#8B929B', font:{size:11}} } } }
+  });
+}
+
+let trainingHistoryChart = null;
+function drawTrainingHistoryChart(hist){
+  const canvas = document.getElementById('trainingHistoryChart');
+  if (!hist || hist.length===0){
+    if (trainingHistoryChart){ trainingHistoryChart.destroy(); trainingHistoryChart=null; }
+    return;
+  }
+  const labels = hist.map(h=>weekLabelClient_(h.week));
+  const data = hist.map(h=>h.done);
+  if (trainingHistoryChart) trainingHistoryChart.destroy();
+  trainingHistoryChart = new Chart(canvas, {
+    type:'bar',
+    data:{ labels, datasets:[{ data, backgroundColor: CURRENT_COLOR, borderRadius:5, maxBarThickness:22 }]},
+    options:{ plugins:{legend:{display:false}},
+      scales:{ x:{ grid:{display:false}, ticks:{color:'#8B929B', font:{size:10}}},
+               y:{ min:0, suggestedMax:7, grid:{color:'#2A2E33'}, ticks:{stepSize:1,color:'#8B929B', font:{size:10}} } } }
+  });
+}
+
+/* ================= REBRÍČEK ================= */
+let LB_DATA = null;
+let LB_MODE = 'month';
+
+function renderLeaderboard_(){
+  if (!LB_DATA) return;
+  const list = LB_MODE === 'month' ? LB_DATA.slotsMonth : LB_DATA.slots;
+  const rows = list.map(s=>{
+    const rank = LB_MODE === 'month' ? s.rankMonth : s.rankOverall;
+    const points = LB_MODE === 'month' ? s.monthPoints : s.totalPoints;
+    const subLabel = LB_MODE === 'month' ? `celkovo: ${s.totalPoints} b.` : `tento mesiac: ${s.monthPoints} b.`;
+    return `
+    <div class="lb-card clickable" onclick="goTab('profil'); loadProfile(${s.slot})">
+      <div class="lb-rank ${rank===1?'first':''}">#${rank}</div>
+      <span class="dot" style="background:${s.color}">${avatarHtml(s.name, s.color, s.photoUrl)}</span>
+      <div class="lb-name"><div class="n">${s.name}${s.slot===CURRENT_SLOT?' (ty)':''}</div><div class="s">${subLabel}</div></div>
+      <div class="lb-points"><div class="p">${points}</div></div>
+    </div>`;
+  }).join('');
+  document.getElementById('lbFull').innerHTML = rows;
+  document.getElementById('dLbPreview').innerHTML = rows;
+}
+
+function goLbMode(mode){
+  LB_MODE = mode;
+  document.querySelectorAll('#lbSegmented button').forEach(b=>b.classList.toggle('active', b.dataset.lb===mode));
+  renderLeaderboard_();
+}
+
+async function loadLeaderboard(){
+  if (CURRENT_SLOT===null) return;
+  const r = await apiGet('leaderboard', {});
+  if (r.error){ return; }
+  LB_DATA = r;
+  renderLeaderboard_();
+}
+
+/* ================= ZÁPIS ================= */
+document.getElementById('entryDate')?.addEventListener?.('change', loadEntry);
+
+async function loadEntry(){
+  if (CURRENT_SLOT===null) return;
+  const date = document.getElementById('entryDate').value;
+  const e = await apiGet('entry', {slot: CURRENT_SLOT, date});
+  if (e.error){ toast(e.error); return; }
+  document.getElementById('fWeight').value = e.weight ?? '';
+  document.getElementById('fTraining').value = e.training ?? '';
+  document.getElementById('fKcal').value = e.kcal ?? '';
+  document.getElementById('fProtein').value = e.protein ?? '';
+  document.getElementById('fCarbs').value = e.carbs ?? '';
+  document.getElementById('fFat').value = e.fat ?? '';
+}
+
+async function saveEntry(btn){
+  await guarded_('saveEntry', btn, 'Ukladám…', async ()=>{
+    const date = document.getElementById('entryDate').value;
+    const payload = {
+      slot: CURRENT_SLOT, date,
+      weight: document.getElementById('fWeight').value,
+      training: document.getElementById('fTraining').value,
+      kcal: document.getElementById('fKcal').value,
+      protein: document.getElementById('fProtein').value,
+      carbs: document.getElementById('fCarbs').value,
+      fat: document.getElementById('fFat').value
+    };
+    const r = await apiPost('saveEntry', payload);
+    if (r.error){ toast(r.error); return; }
+    toast('Uložené ✓');
+    clearEntryForm();
+    loadDashboard();
+    loadLeaderboard();
+  });
+}
+
+function clearEntryForm(){
+  document.getElementById('fWeight').value = '';
+  document.getElementById('fTraining').value = '';
+  document.getElementById('fKcal').value = '';
+  document.getElementById('fProtein').value = '';
+  document.getElementById('fCarbs').value = '';
+  document.getElementById('fFat').value = '';
+}
+
+/* ================= MIERY ================= */
+function buildMierFields(){
+  const wrap = document.getElementById('mierFields');
+  wrap.innerHTML = INIT.measureLabels.map(l=>
+    `<label class="field"><span>${l}</span><input type="number" step="0.1" data-m="${l}"></label>`).join('');
+}
+
+async function loadMeasurements(){
+  if (CURRENT_SLOT===null) return;
+  const week = INIT.week || 1;
+  const m = await apiGet('measurements', {slot: CURRENT_SLOT, week});
+  if (m.error){ toast(m.error); return; }
+  document.querySelectorAll('[data-m]').forEach(inp=>{
+    inp.value = m[inp.dataset.m] ?? '';
+  });
+}
+
+async function saveMeasurements(btn){
+  await guarded_('saveMeasurements', btn, 'Ukladám…', async ()=>{
+    const week = INIT.week || 1;
+    const payload = { slot: CURRENT_SLOT, week };
+    document.querySelectorAll('[data-m]').forEach(inp=>{ payload[inp.dataset.m] = inp.value; });
+    const r = await apiPost('saveMeasurements', payload);
+    if (r.error){ toast(r.error); return; }
+    toast('Miery uložené ✓');
+    document.querySelectorAll('[data-m]').forEach(inp=>{ inp.value = ''; });
+  });
+}
+
+/* ================= PROFIL ================= */
+let PROFILE_VIEW_SLOT = null;
+
+async function loadProfile(slot){
+  if (CURRENT_SLOT===null) return;
+  PROFILE_VIEW_SLOT = slot;
+  const p = await apiGet('profile', { slot: CURRENT_SLOT, viewSlot: slot });
+  if (p.error){ toast(p.error); return; }
+
+  document.getElementById('profilBackBtn').style.display = p.isOwn ? 'none' : 'inline-flex';
+  document.getElementById('pAvatarEdit').style.display = p.isOwn ? 'flex' : 'none';
+
+  const avatarEl = document.getElementById('pAvatar');
+  avatarEl.style.background = p.color;
+  avatarEl.innerHTML = avatarHtml(p.name, p.color, p.photoUrl) +
+    (p.isOwn ? '<div class="avatar-edit" onclick="document.getElementById(\'photoInput\').click()">✏️</div>' : '');
+
+  document.getElementById('pName').textContent = p.name + (p.isOwn ? '' : '');
+  document.getElementById('pSince').textContent = p.memberSince ? ('člen od ' + p.memberSince) : '';
+
+  const hist = document.getElementById('pHistory');
+  if (!p.weeklyHistory || p.weeklyHistory.length===0){
+    hist.innerHTML = '<div class="history-empty">Zatiaľ žiadne dáta.</div>';
+  } else {
+    hist.innerHTML = p.weeklyHistory.slice().reverse().map(w=>`
+      <div class="history-row">
+        <div class="w">${weekLabelClient_(w.week)}</div>
+        <div class="v">${w.weightAvg!=null ? w.weightAvg.toFixed(1)+' kg' : '—'}</div>
+        <div class="v">${w.trainingsDone}/7 tréning.</div>
+        <div class="v">${w.kcalAvg!=null ? w.kcalAvg+' kcal' : '—'}</div>
+      </div>`).join('');
+  }
+
+  const comp = document.getElementById('pComparison');
+  comp.innerHTML = p.comparison.map(c=>`
+    <div class="lb-card ${c.slot!==PROFILE_VIEW_SLOT?'clickable':''}" ${c.slot!==PROFILE_VIEW_SLOT?`onclick="loadProfile(${c.slot})"`:''}>
+      <div class="lb-rank ${c.rank===1?'first':''}">#${c.rank}</div>
+      <span class="dot" style="background:${c.color}">${avatarHtml(c.name, c.color, c.photoUrl)}</span>
+      <div class="lb-name"><div class="n">${c.name}${c.isSelf?' (zobrazené)':''}</div></div>
+      <div class="lb-points"><div class="p">${c.totalPoints}</div></div>
+    </div>`).join('');
+}
+
+async function onPhotoChosen(ev){
+  const file = ev.target.files[0];
+  if (!file) return;
+  const pin = prompt('Zadaj svoj PIN pre potvrdenie zmeny fotky:');
+  if (!pin) return;
+  try{
+    const base64 = await resizeImageFile(file, 500);
+    const r = await apiPost('savePhoto', { slot: CURRENT_SLOT, pin, base64, mime: 'image/jpeg' });
+    if (r.error){ toast(r.error); return; }
+    CURRENT_PHOTO = r.photoUrl;
+    localStorage.setItem('ft_photo', CURRENT_PHOTO);
+    toast('Fotka uložená');
+    document.getElementById('userDot').innerHTML = avatarHtml(CURRENT_USER, CURRENT_COLOR, CURRENT_PHOTO);
+    loadProfile(MY_SLOT);
+    loadLeaderboard();
+  }catch(err){ toast('Nepodarilo sa nahrať fotku'); }
+}
+
+/* ================= NASTAVENIA ================= */
+function renderMyProfileCard(){
+  document.getElementById('myProfileCard').innerHTML = `
+    <div class="person-btn selected" style="pointer-events:none;">
+      <span class="dot" style="background:${CURRENT_COLOR}">${avatarHtml(CURRENT_USER, CURRENT_COLOR, CURRENT_PHOTO)}</span>${CURRENT_USER}
+    </div>`;
+  document.getElementById('setName').value = CURRENT_USER;
+  renderColorPicker('setColorPicker', CURRENT_COLOR);
+}
+
+async function saveProfileEdit(btn){
+  await guarded_('saveProfileEdit', btn, 'Ukladám…', async ()=>{
+    const name = document.getElementById('setName').value.trim();
+    const color = document.getElementById('setColorPicker').dataset.selected;
+    const newPin = document.getElementById('setNewPin').value.trim();
+    const currentPin = document.getElementById('setCurrentPin').value.trim();
+    if (!currentPin){ toast('Zadaj súčasný PIN'); return; }
+    const r = await apiPost('updateProfile', { slot: CURRENT_SLOT, name, color, newPin, currentPin });
+    if (r.error){ toast(r.error); return; }
+    CURRENT_USER = r.name; CURRENT_COLOR = r.color;
+    localStorage.setItem('ft_name', CURRENT_USER);
+    localStorage.setItem('ft_color', CURRENT_COLOR);
+    document.getElementById('setNewPin').value='';
+    document.getElementById('setCurrentPin').value='';
+    document.getElementById('userName').textContent = CURRENT_USER;
+    document.getElementById('userDot').style.background = CURRENT_COLOR;
+    document.documentElement.style.setProperty('--accent', CURRENT_COLOR);
+    document.getElementById('greet').textContent = 'Ahoj, ' + CURRENT_USER;
+    renderMyProfileCard();
+    loadLeaderboard();
+    toast('Profil uložený');
+  });
+}
+
+async function loadGoals(){
+  if (CURRENT_SLOT===null) return;
+  const g = await apiGet('goals', {slot: CURRENT_SLOT});
+  if (g.error) return;
+  document.getElementById('gKcal').value = g.kcal ?? '';
+  document.getElementById('gProtein').value = g.protein ?? '';
+  document.getElementById('gCarbs').value = g.carbs ?? '';
+  document.getElementById('gFat').value = g.fat ?? '';
+}
+
+async function saveGoals(btn){
+  await guarded_('saveGoals', btn, 'Ukladám…', async ()=>{
+    const payload = {
+      slot: CURRENT_SLOT,
+      kcal: document.getElementById('gKcal').value,
+      protein: document.getElementById('gProtein').value,
+      carbs: document.getElementById('gCarbs').value,
+      fat: document.getElementById('gFat').value
+    };
+    const r = await apiPost('saveGoals', payload);
+    if (r.error){ toast(r.error); return; }
+    toast('Ciele uložené');
+    loadDashboard();
+  });
+}
+
+async function deleteOwnProfile(btn){
+  await guarded_('deleteOwnProfile', btn, 'Mažem…', async ()=>{
+    const pin = document.getElementById('delPin').value.trim();
+    if (!pin){ toast('Zadaj svoj PIN'); return; }
+    if (!confirm('Naozaj natrvalo vymazať tvoj profil? Táto akcia sa nedá vrátiť späť.')) return;
+    const r = await apiPost('deleteProfile', { slot: CURRENT_SLOT, pin });
+    if (r.error){ toast(r.error); return; }
+    toast('Profil vymazaný');
+    logout();
+  });
+}
+
+function saveApiUrl(){
+  const v = document.getElementById('apiUrlInput').value.trim();
+  if (!v) return;
+  API_URL = v;
+  localStorage.setItem('ft_api', v);
+  toast('URL uložená');
+  boot();
+}
+document.getElementById('apiUrlInput') && (document.getElementById('apiUrlInput').value = API_URL);
+
+/* ================= SERVICE WORKER ================= */
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+}
+
+initApp();
+</script>
+</body>
+</html>
